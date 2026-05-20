@@ -1,0 +1,45 @@
+cat > .github/workflows/ci-cd.yml << 'EOF'
+name: CI/CD Pipeline - Gadget Kecee
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  syntax-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with: { php-version: '8.0' }
+      - run: php -l index.php
+
+  database-test:
+    runs-on: ubuntu-latest
+    needs: syntax-check
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: gadgetkecee_test
+        ports: [3306:3306]
+    steps:
+      - uses: actions/checkout@v4
+      - run: mysql -h127.0.0.1 -uroot -proot gadgetkecee_test < gadgetkecee.sql
+      - run: php -r "echo 'Database OK';"
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: database-test
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: SamKirkland/FTP-Deploy-Action@v4
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          local-dir: ./
+          server-dir: ${{ secrets.FTP_PATH }}
+EOF
